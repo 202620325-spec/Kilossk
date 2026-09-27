@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f3f3ef">
+<title>Kilossk Painter</title>
+<style>
+:root{--bg:#eeeeea;--panel:#fafaf7;--ink:#111;--line:#d7d7d0;--muted:#74746e}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink)}
+button,input,select,textarea{font:inherit}button{cursor:pointer}.top{height:68px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:rgba(250,250,247,.95);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10}.brand{font-weight:900;letter-spacing:.14em}.sub{font-size:11px;color:var(--muted);margin-top:3px}.row{display:flex;gap:7px;flex-wrap:wrap}.btn{border:1px solid var(--line);background:#fff;color:#111;border-radius:10px;padding:9px 11px}.btn.primary{background:#111;color:#fff;border-color:#111}.btn.danger{color:#a33}.layout{display:grid;grid-template-columns:250px minmax(360px,1fr) 320px;gap:14px;padding:14px;min-height:calc(100vh - 68px)}.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:15px;overflow:auto}.section+.section{margin-top:18px;padding-top:18px;border-top:1px solid var(--line)}h2{font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:#555;margin:0 0 12px}.lab{font-size:12px;color:#5f5f59;margin:9px 0 5px;display:flex;justify-content:space-between}.wide{width:100%;margin-top:8px}input[type=range],input[type=text],input[type=password],select,textarea{width:100%}input[type=text],input[type=password],select,textarea{border:1px solid var(--line);border-radius:9px;background:#fff;padding:9px;color:#111}.two{display:grid;grid-template-columns:1fr 1fr;gap:7px}.tool.active{background:#111;color:#fff}.layer{display:flex;align-items:center;justify-content:space-between;padding:9px;border:1px solid var(--line);border-radius:10px;background:#fff;margin:6px 0}.layer b{font-size:12px}.layer small{display:block;color:var(--muted);font-size:10px;margin-top:2px}.canvasCol{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:0}.frame{width:min(100%,calc(100vh - 115px));aspect-ratio:1;background:#fff;border:1px solid #d0d0ca;box-shadow:0 12px 30px rgba(0,0,0,.08);position:relative;overflow:hidden;touch-action:none}.frame canvas{position:absolute;inset:0;width:100%;height:100%}#photo{z-index:1}#ai{z-index:2;pointer-events:none}#human{z-index:3;pointer-events:none}#inputCanvas{z-index:4}.hint{font-size:10px;color:#85857e;margin-top:8px}.tabs{display:grid;grid-template-columns:1fr 1fr;background:#ecece7;border-radius:11px;padding:4px;gap:4px}.tab{border:0;border-radius:8px;background:transparent;padding:8px;color:#666}.tab.active{background:#fff;color:#111;font-weight:700}.tabc{display:none;padding-top:12px}.tabc.active{display:block}.status{font-size:11px;background:#efefeb;padding:9px;border-radius:9px;margin-top:9px;color:#60605a}.check{display:flex;gap:7px;align-items:center;font-size:11px;color:#666;margin-top:9px}.check input{width:auto}.tools code{display:inline-block;font-size:10px;background:#ecece8;padding:4px 5px;border-radius:5px;margin:2px}.log{font-size:10px;white-space:pre-wrap;max-height:180px;overflow:auto;background:#111;color:#ddd;padding:8px;border-radius:8px}.note{font-size:11px;line-height:1.5;color:#666}.coords{font-size:11px;color:#777}
+@media(max-width:1080px){.layout{grid-template-columns:220px 1fr}.right{grid-column:1/-1}.frame{width:min(100%,720px)}}
+@media(max-width:700px){.top{height:auto;padding:10px;align-items:flex-start}.layout{display:flex;flex-direction:column;padding:9px}.canvasCol{order:-1}.frame{width:100%}.panel{border-radius:13px}.sub{display:none}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div><div class="brand">KILOSSK</div><div class="sub">LLM Painter Whiteboard</div></div>
+  <div class="row"><button class="btn" id="undo">Undo</button><button class="btn" id="redo">Redo</button><button class="btn danger" id="clear">Clear AI + Human</button><button class="btn primary" id="export">Export PNG</button></div>
+</header>
+<main class="layout">
+  <aside class="panel">
+    <div class="section"><h2>Human brush</h2>
+      <div class="lab">굵기 <span id="sizeV">8px</span></div><input id="size" type="range" min="1" max="64" value="8">
+      <div class="lab">진하기 <span id="opacityV">100%</span></div><input id="opacity" type="range" min="5" max="100" value="100">
+      <div class="two" style="margin-top:10px"><button class="btn tool active" id="pen">검은 펜</button><button class="btn tool" id="eraser">지우개</button></div>
+    </div>
+    <div class="section"><h2>Layers · same plane</h2>
+      <div class="layer"><div><b>1. AI 레이어</b><small>AI/MCP만 수정</small></div><input id="visAi" type="checkbox" checked></div>
+      <div class="layer"><div><b>2. 사람 레이어</b><small>직접 그리는 가이드</small></div><input id="visHuman" type="checkbox" checked></div>
+      <div class="layer"><div><b>3. 사진 레이어</b><small>참조 이미지</small></div><input id="visPhoto" type="checkbox" checked></div>
+      <input id="photoFile" type="file" accept="image/*" hidden>
+      <button class="btn wide" id="loadPhoto">사진 불러오기</button><button class="btn wide" id="clearPhoto">사진 비우기</button>
+    </div>
+    <div class="section"><h2>Canvas</h2><div class="coords">1024 × 1024 · <span id="coords">—</span></div></div>
+  </aside>
+
+  <section class="canvasCol">
+    <div class="frame">
+      <canvas id="photo" width="1024" height="1024"></canvas>
+      <canvas id="ai" width="1024" height="1024"></canvas>
+      <canvas id="human" width="1024" height="1024"></canvas>
+      <canvas id="inputCanvas" width="1024" height="1024"></canvas>
+    </div>
+    <div class="hint">사진 → AI → 사람 순으로 같은 좌표계에 겹쳐 표시</div>
+  </section>
+
+  <aside class="panel right">
+    <div class="tabs"><button class="tab active" data-tab="api">API AI</button><button class="tab" data-tab="mcp">MCP / Work</button></div>
+    <div id="apiTab" class="tabc active">
+      <div class="lab">Provider</div><select id="provider"><option value="openrouter">OpenRouter</option><option value="upstage">Upstage</option><option value="custom">Custom OpenAI-compatible</option></select>
+      <div class="lab">API Key</div><input id="key" type="password" autocomplete="off" placeholder="이 페이지 메모리에만 존재">
+      <div class="lab">Model</div><input id="model" type="text" value="openai/gpt-6-astra">
+      <div class="lab">Endpoint</div><input id="endpoint" type="text" value="https://openrouter.ai/api/v1/chat/completions">
+      <div class="lab">Instruction</div><textarea id="prompt" rows="7" placeholder="예: 사람 레이어의 동그라미를 얼굴 가이드로 보고 AI 레이어에 얼굴을 완성해."></textarea>
+      <label class="check"><input id="sendCanvas" type="checkbox" checked>현재 합성 캔버스를 모델에 보여주기</label>
+      <button class="btn primary wide" id="run">AI가 직접 그리기</button><button class="btn wide" id="stop" disabled>중지</button>
+      <div class="status" id="status">준비됨</div>
+      <p class="note">OpenRouter vision 모델은 사람/사진 레이어를 보며 그릴 수 있습니다. Upstage Solar Pro 3/4는 텍스트+tool calling 모드로 연결됩니다.</p>
+    </div>
+    <div id="mcpTab" class="tabc">
+      <p class="note">Codex/Work/외부 MCP 클라이언트는 companion server를 거쳐 AI 레이어만 수정합니다.</p>
+      <div class="lab">Browser bridge</div><input id="bridgeUrl" type="text" value="ws://localhost:8787/browser">
+      <button class="btn primary wide" id="connect">브리지 연결</button><div class="status" id="bridgeStatus">연결 안 됨</div>
+      <div class="tools" style="margin-top:12px"><code>canvas_snapshot</code><code>stroke</code><code>polyline</code><code>dot</code><code>erase</code><code>clear_ai</code><code>batch</code></div>
+    </div>
+    <details style="margin-top:15px"><summary style="font-size:11px">AI action log</summary><pre id="log" class="log"></pre></details>
+  </aside>
+</main>
+<script>
+const $=id=>document.getElementById(id), W=1024,H=1024;
+const C={photo:$('photo'),ai:$('ai'),human:$('human'),input:$('inputCanvas')};
+const X=Object.fromEntries(Object.entries(C).map(([k,c])=>[k,c.getContext('2d',{willReadFrequently:true})]));
+['photo','ai','human'].forEach(k=>{X[k].lineCap='round';X[k].lineJoin='round'});
+let down=false,last=null,mode='pen',history=[],future=[],aborter=null,bridge=null;
+
+function point(e){const r=C.input.getBoundingClientRect();return{x:Math.max(0,Math.min(W,(e.clientX-r.left)/r.width*W)),y:Math.max(0,Math.min(H,(e.clientY-r.top)/r.height*H))}}
+function snap(k){return C[k].toDataURL('image/png')}
+function restore(canvas,url){return new Promise(ok=>{const im=new Image();im.onload=()=>{const q=canvas.getContext('2d');q.clearRect(0,0,W,H);q.drawImage(im,0,0);ok()};im.src=url})}
+function save(){history.push({ai:snap('ai'),human:snap('human'),photo:snap('photo')});if(history.length>35)history.shift();future=[]}
+async function load(s){await Promise.all(['ai','human','photo'].map(k=>restore(C[k],s[k])))}
+save();
+
+function humanStroke(a,b){const c=X.human;c.save();c.globalAlpha=+$('opacity').value/100;c.lineWidth=+$('size').value;c.strokeStyle='#000';if(mode==='eraser')c.globalCompositeOperation='destination-out';c.beginPath();c.moveTo(a.x,a.y);c.lineTo(b.x,b.y);c.stroke();c.restore()}
+C.input.onpointerdown=e=>{down=true;last=point(e);C.input.setPointerCapture(e.pointerId)};
+C.input.onpointermove=e=>{const p=point(e);$('coords').textContent=Math.round(p.x)+', '+Math.round(p.y);if(down){humanStroke(last,p);last=p}};
+function end(){if(down){down=false;save()}} C.input.onpointerup=end;C.input.onpointercancel=end;
+$('size').oninput=e=>$('sizeV').textContent=e.target.value+'px';$('opacity').oninput=e=>$('opacityV').textContent=e.target.value+'%';
+$('pen').onclick=()=>{mode='pen';$('pen').classList.add('active');$('eraser').classList.remove('active')};$('eraser').onclick=()=>{mode='eraser';$('eraser').classList.add('active');$('pen').classList.remove('active')};
+[['visAi','ai'],['visHuman','human'],['visPhoto','photo']].forEach(([id,k])=>$(id).onchange=e=>C[k].style.opacity=e.target.checked?'1':'0');
+
+$('loadPhoto').onclick=()=>$('photoFile').click();
+$('photoFile').onchange=e=>{const f=e.target.files&&e.target.files[0];if(!f)return;const im=new Image();im.onload=()=>{X.photo.clearRect(0,0,W,H);const s=Math.min(W/im.width,H/im.height),w=im.width*s,h=im.height*s;X.photo.drawImage(im,(W-w)/2,(H-h)/2,w,h);save();URL.revokeObjectURL(im.src)};im.src=URL.createObjectURL(f)};
+$('clearPhoto').onclick=()=>{X.photo.clearRect(0,0,W,H);save()};
+$('clear').onclick=()=>{X.ai.clearRect(0,0,W,H);X.human.clearRect(0,0,W,H);save()};
+$('undo').onclick=async()=>{if(history.length<2)return;future.push(history.pop());await load(history[history.length-1])};
+$('redo').onclick=async()=>{const s=future.pop();if(!s)return;history.push(s);await load(s)};
+
+function composite(){const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,W,H);if($('visPhoto').checked)x.drawImage(C.photo,0,0);if($('visAi').checked)x.drawImage(C.ai,0,0);if($('visHuman').checked)x.drawImage(C.human,0,0);return c.toDataURL('image/png')}
+$('export').onclick=()=>{const a=document.createElement('a');a.href=composite();a.download='kilossk.png';a.click()};
+
+function n(v,a,b){v=Number(v)||0;return Math.max(a,Math.min(b,v))}
+const paint={
+ stroke(a){const c=X.ai;c.save();c.strokeStyle='#000';c.globalAlpha=n(a.opacity??1,0,1);c.lineWidth=n(a.width??6,1,80);c.beginPath();c.moveTo(n(a.x1,0,W),n(a.y1,0,H));c.lineTo(n(a.x2,0,W),n(a.y2,0,H));c.stroke();c.restore()},
+ polyline(a){if(!Array.isArray(a.points)||a.points.length<2)return;const c=X.ai;c.save();c.strokeStyle='#000';c.globalAlpha=n(a.opacity??1,0,1);c.lineWidth=n(a.width??6,1,80);c.beginPath();c.moveTo(n(a.points[0].x,0,W),n(a.points[0].y,0,H));a.points.slice(1).forEach(p=>c.lineTo(n(p.x,0,W),n(p.y,0,H)));if(a.closed)c.closePath();c.stroke();c.restore()},
+ dot(a){const c=X.ai;c.save();c.fillStyle='#000';c.globalAlpha=n(a.opacity??1,0,1);c.beginPath();c.arc(n(a.x,0,W),n(a.y,0,H),n(a.radius??4,1,80),0,Math.PI*2);c.fill();c.restore()},
+ erase(a){if(!Array.isArray(a.points)||a.points.length<2)return;const c=X.ai;c.save();c.globalCompositeOperation='destination-out';c.lineWidth=n(a.width??20,1,120);c.beginPath();c.moveTo(a.points[0].x,a.points[0].y);a.points.slice(1).forEach(p=>c.lineTo(p.x,p.y));c.stroke();c.restore()},
+ clear_ai(){X.ai.clearRect(0,0,W,H)},
+ batch(a){(a.actions||[]).slice(0,600).forEach(v=>exec(v,false))}
+};
+function exec(a,doLog=true){if(!a||!paint[a.tool])throw Error('Unknown tool '+(a&&a.tool));paint[a.tool](a.args||{});if(doLog)log(a.tool,a.args)}
+function log(name,args){$('log').textContent='['+new Date().toLocaleTimeString()+'] '+name+' '+JSON.stringify(args||{})+'\n'+$('log').textContent}
+
+const tools=[
+ {type:'function',function:{name:'stroke',description:'Draw one black stroke on AI layer. Coordinates 0..1024.',parameters:{type:'object',properties:{x1:{type:'number'},y1:{type:'number'},x2:{type:'number'},y2:{type:'number'},width:{type:'number'},opacity:{type:'number'}},required:['x1','y1','x2','y2']}}},
+ {type:'function',function:{name:'polyline',description:'Draw a black multi-point line on AI layer.',parameters:{type:'object',properties:{points:{type:'array',items:{type:'object',properties:{x:{type:'number'},y:{type:'number'}},required:['x','y']}},width:{type:'number'},opacity:{type:'number'},closed:{type:'boolean'}},required:['points']}}},
+ {type:'function',function:{name:'dot',description:'Draw black dot on AI layer.',parameters:{type:'object',properties:{x:{type:'number'},y:{type:'number'},radius:{type:'number'},opacity:{type:'number'}},required:['x','y']}}},
+ {type:'function',function:{name:'erase',description:'Erase path from AI layer only.',parameters:{type:'object',properties:{points:{type:'array',items:{type:'object',properties:{x:{type:'number'},y:{type:'number'}},required:['x','y']}},width:{type:'number'}},required:['points']}}},
+ {type:'function',function:{name:'clear_ai',description:'Clear AI layer.',parameters:{type:'object',properties:{}}}},
+ {type:'function',function:{name:'batch',description:'Execute many painter actions. Use for coherent groups of strokes.',parameters:{type:'object',properties:{actions:{type:'array',items:{type:'object',properties:{tool:{type:'string',enum:['stroke','polyline','dot','erase']},args:{type:'object'}},required:['tool','args']}}},required:['actions']}}}
+];
+
+$('provider').onchange=()=>{const p=$('provider').value;if(p==='openrouter'){$('endpoint').value='https://openrouter.ai/api/v1/chat/completions';$('model').value='openai/gpt-6-astra';$('sendCanvas').disabled=false;$('sendCanvas').checked=true}else if(p==='upstage'){$('endpoint').value='https://api.upstage.ai/v1/chat/completions';$('model').value='solar-pro4';$('sendCanvas').checked=false;$('sendCanvas').disabled=true}else{$('sendCanvas').disabled=false}};
+$('stop').onclick=()=>aborter&&aborter.abort();
+
+$('run').onclick=async()=>{
+ const key=$('key').value.trim(),endpoint=$('endpoint').value.trim(),model=$('model').value.trim(),prompt=$('prompt').value.trim();
+ if(!key||!endpoint||!model||!prompt){$('status').textContent='API Key / endpoint / model / instruction을 확인';return}
+ aborter=new AbortController();$('run').disabled=true;$('stop').disabled=false;$('status').textContent='계획 중…';
+ const system='너는 이미지 생성기가 아니라 1024x1024 흰 종이에 검은 펜으로 직접 그리는 Painter Agent다. 반드시 제공된 painter tools만 호출해 AI 레이어만 수정한다. 사람 레이어와 사진 레이어는 관찰용이다. 큰 형태, 구조, 세부 순서로 그린다. 사용자가 그린 가이드라인은 완성선이 아니라 위치, 방향, 크기, 의미 constraint로 해석한다. 검은색만 사용하고 width와 opacity로 굵기와 진하기를 조절한다. 의미 있는 획 묶음은 batch를 활용한다. 캔버스를 다시 볼 수 있으면 방금 결과를 점검하고 수정한다.';
+ let user=[{type:'text',text:prompt}];if($('sendCanvas').checked)user.push({type:'image_url',image_url:{url:composite()}});
+ let messages=[{role:'system',content:system},{role:'user',content:user}],round=0;
+ try{
+  while(round++<8){
+   const headers={'Content-Type':'application/json','Authorization':'Bearer '+key};if($('provider').value==='openrouter'){headers['HTTP-Referer']=location.href;headers['X-Title']='Kilossk Painter'}
+   const res=await fetch(endpoint,{method:'POST',headers,body:JSON.stringify({model,messages,tools,tool_choice:'auto',temperature:.2,max_tokens:5000}),signal:aborter.signal});
+   if(!res.ok)throw Error(res.status+' '+await res.text());
+   const data=await res.json(),m=data.choices&&data.choices[0]&&data.choices[0].message;if(!m)throw Error('Invalid model response');
+   messages.push(m);const calls=m.tool_calls||[];
+   if(!calls.length){$('status').textContent=(m.content||'완료').slice(0,180);break}
+   $('status').textContent='획 실행 '+calls.length+'개';
+   for(const tc of calls){let a={};try{a=JSON.parse(tc.function.arguments||'{}')}catch{};try{exec({tool:tc.function.name,args:a});messages.push({role:'tool',tool_call_id:tc.id,content:'ok'})}catch(e){messages.push({role:'tool',tool_call_id:tc.id,content:'error: '+e.message})}}
+   if($('sendCanvas').checked)messages.push({role:'user',content:[{type:'text',text:'방금 그린 결과를 다시 보고 계속 그리거나 수정해. 충분하면 완료라고 답해.'},{type:'image_url',image_url:{url:composite()}}]});
+   else messages.push({role:'user',content:'계속 필요한 획을 그려. 충분하면 완료라고 답해.'});
+  }
+  save();if(round>=8)$('status').textContent='최대 반복 종료';
+ }catch(e){$('status').textContent=e.name==='AbortError'?'중지됨':'오류: '+e.message;log('error',{message:e.message})}
+ finally{aborter=null;$('run').disabled=false;$('stop').disabled=true}
+};
+
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.tabc').forEach(x=>x.classList.remove('active'));t.classList.add('active');$(t.dataset.tab==='api'?'apiTab':'mcpTab').classList.add('active')});
+
+function bsend(o){if(bridge&&bridge.readyState===WebSocket.OPEN)bridge.send(JSON.stringify(o))}
+$('connect').onclick=()=>{try{if(bridge)bridge.close();bridge=new WebSocket($('bridgeUrl').value.trim());$('bridgeStatus').textContent='연결 중…';bridge.onopen=()=>{$('bridgeStatus').textContent='연결됨';bsend({type:'hello',role:'browser',canvas:{width:W,height:H}})};bridge.onclose=()=>$('bridgeStatus').textContent='연결 끊김';bridge.onerror=()=>$('bridgeStatus').textContent='연결 오류';bridge.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch{return}if(m.type==='tool'){try{let result={ok:true};if(m.name==='canvas_snapshot')result={ok:true,image:composite(),ai:snap('ai'),human:snap('human'),photo:snap('photo')};else{exec({tool:m.name,args:m.args||{}});save()}bsend({type:'tool_result',id:m.id,result})}catch(err){bsend({type:'tool_result',id:m.id,error:err.message})}}}}catch(e){$('bridgeStatus').textContent='실패: '+e.message}};
+</script>
+</body>
+</html>
